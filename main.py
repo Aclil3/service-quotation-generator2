@@ -1,217 +1,347 @@
-from fastapi import FastAPI, HTTPException, Response
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
-from pydantic import BaseModel, Field
+import os
+import io
+import re
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse, Response
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 from typing import List, Optional
 from jinja2 import Template
-from weasyprint import HTML
-import os
+from weasyprint import HTML, CSS
 
-app = FastAPI(title="Service Quotation PDF Generator")
+app = FastAPI()
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
+# Input schemas
 class PartItem(BaseModel):
-    part_num: str = ""
-    description: str = ""
-    qty: int = 1
-    price: float = 0.0
+    part_num: Optional[str] = ""
+    description: Optional[str] = ""
+    qty: Optional[int] = 0
+    price: Optional[float] = 0.0
 
 class EquipmentItem(BaseModel):
-    make: str = ""
-    model: str = ""
-    serial: str = ""
-    work_required: str = ""
-    parts: List[PartItem] = Field(default_factory=list)
+    make: Optional[str] = ""
+    model: Optional[str] = ""
+    serial: Optional[str] = ""
+    work_required: Optional[str] = ""
+    parts: Optional[List[PartItem]] = []
 
 class LabourItem(BaseModel):
-    code: str = ""
-    description: str = ""
-    hours: float = 0.0
-    rate: float = 0.0
+    code: Optional[str] = ""
+    description: Optional[str] = ""
+    hours: Optional[float] = 0.0
+    rate: Optional[float] = 0.0
 
-class QuotationRequest(BaseModel):
-    date: str = ""
-    wo_num: str = ""
-    cust_num: str = ""
-    cust_name: str = ""
-    address: str = ""
-    phone: str = ""
-    fax: Optional[str] = ""
-    email: Optional[str] = ""
-    equipment: List[EquipmentItem] = Field(default_factory=list)
-    labour: List[LabourItem] = Field(default_factory=list)
+class QuotationPayload(BaseModel):
+    date: Optional[str] = ""
+    wo_num: Optional[str] = ""
+    cust_name: Optional[str] = ""
+    address: Optional[str] = ""
+    phone: Optional[str] = ""
+    tech: Optional[str] = "Adam"
     comments: Optional[str] = ""
-    tech: str = ""
+    equipment: Optional[List[EquipmentItem]] = []
+    labour: Optional[List[LabourItem]] = []
 
-HTML_PDF_TEMPLATE = """
+# Embedded Jinja2 HTML Template with layout fixes
+HTML_TEMPLATE = """
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <style>
-  @page { size: letter; margin: 0.4in; }
-  body { font-family: Arial, Helvetica, sans-serif; font-size: 11px; line-height: 1.4; color: #111111; margin: 0; }
-  .pdf-header { width: 100%; border-bottom: 1.5px solid #000000; padding-bottom: 4px; margin-bottom: 8px; }
-  .pdf-layout-table { width: 100%; border-collapse: collapse; table-layout: fixed; margin-bottom: 6px; }
-  .pdf-layout-table td { padding: 4px 2px; vertical-align: bottom; font-size: 11px; color: #111111; }
-  .pdf-line-cell { border-bottom: 1px solid #333333; }
-  .pdf-label { font-weight: bold; font-size: 11px; color: #000000; text-transform: uppercase; }
-  .pdf-val { font-weight: normal; font-size: 11px; color: #222222; word-break: break-word; }
-  .pdf-section-head { background: #e5e7eb; font-weight: bold; padding: 4px 6px; border: 1px solid #333333; margin-top: 10px; font-size: 11px; color: #000000; text-transform: uppercase; page-break-after: avoid; }
-  .pdf-equip-block { border: 1px solid #333333; padding: 6px 8px; margin-top: 6px; margin-bottom: 8px; background: #fafafa; page-break-inside: avoid; }
-  .pdf-table { width: 100%; border-collapse: collapse; table-layout: fixed; margin-top: 4px; }
-  .pdf-table th, .pdf-table td { border: 1px solid #333333; padding: 4px 6px; text-align: left; font-size: 10px; color: #111111; }
-  .pdf-table th { background: #f3f4f6; font-weight: bold; text-transform: uppercase; }
-  .pdf-table tr { page-break-inside: avoid; }
+  @page {
+    size: letter;
+    margin: 10mm;
+  }
+  
+  * {
+    box-sizing: border-box;
+    font-family: Helvetica, Arial, sans-serif;
+  }
+  
+  body {
+    font-size: 10px;
+    color: #000000;
+    margin: 0;
+    padding: 0;
+  }
+
+  .header-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 8px;
+  }
+
+  .header-table td {
+    vertical-align: top;
+  }
+
+  .title-main {
+    font-size: 16px;
+    font-weight: bold;
+    text-transform: uppercase;
+  }
+
+  .info-box {
+    border: 1px solid #000;
+    padding: 6px;
+    margin-bottom: 8px;
+    width: 100%;
+  }
+
+  .info-table {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+  }
+
+  .info-table td {
+    padding: 2px 4px;
+    vertical-align: top;
+    word-wrap: break-word;
+  }
+
+  .section-header {
+    background-color: #e5e7eb;
+    font-weight: bold;
+    font-size: 11px;
+    padding: 4px 6px;
+    border: 1px solid #000;
+    text-transform: uppercase;
+    margin-top: 8px;
+    margin-bottom: 4px;
+  }
+
+  .equip-box {
+    border: 1px solid #000;
+    margin-bottom: 8px;
+    padding: 6px;
+  }
+
+  .equip-row {
+    margin-bottom: 4px;
+  }
+
+  /* Fixed layout tables to strictly constrain width within 100% */
+  table.data-table {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+    margin-top: 4px;
+    margin-bottom: 6px;
+  }
+
+  table.data-table th, table.data-table td {
+    border: 1px solid #000;
+    padding: 4px 6px;
+    text-align: left;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+
+  table.data-table th {
+    background-color: #f3f4f6;
+    font-size: 9px;
+    font-weight: bold;
+    text-transform: uppercase;
+  }
+
   .text-right { text-align: right; }
-  .no-break { page-break-inside: avoid; }
+  .text-center { text-align: center; }
+  .bold { font-weight: bold; }
+
+  .summary-table {
+    width: 40%;
+    margin-left: auto;
+    table-layout: fixed;
+    border-collapse: collapse;
+    margin-top: 8px;
+  }
+
+  .summary-table td {
+    border: 1px solid #000;
+    padding: 4px 6px;
+  }
+
+  .comments-box {
+    border: 1px solid #000;
+    padding: 6px;
+    min-height: 40px;
+    margin-top: 4px;
+    word-wrap: break-word;
+  }
 </style>
 </head>
 <body>
-  <table class="pdf-layout-table pdf-header">
+
+  <table class="header-table">
     <tr>
-      <td style="font-size: 16px; font-weight: bold; padding: 0;">SERVICE QUOTATION</td>
-      <td class="text-right" style="padding: 0;">
-        <span class="pdf-label">DATE:</span> <span class="pdf-val">{{ req.date }}</span>
+      <td>
+        <div class="title-main">Service Quotation</div>
+      </td>
+      <td class="text-right">
+        <div><span class="bold">Date:</span> {{ date }}</div>
+        <div><span class="bold">Work Order #:</span> {{ wo_num }}</div>
       </td>
     </tr>
   </table>
 
-  <table class="pdf-layout-table">
-    <tr><td colspan="2" class="pdf-line-cell"><span class="pdf-label">WORK ORDER #:</span> <span class="pdf-val">{{ req.wo_num }}</span></td></tr>
-    <tr>
-      <td style="width: 50%;" class="pdf-line-cell"><span class="pdf-label">CUSTOMER #:</span> <span class="pdf-val">{{ req.cust_num }}</span></td>
-      <td style="width: 50%;" class="pdf-line-cell"><span class="pdf-label">CUSTOMER NAME:</span> <span class="pdf-val">{{ req.cust_name }}</span></td>
-    </tr>
-    <tr><td colspan="2" class="pdf-line-cell"><span class="pdf-label">ADDRESS:</span> <span class="pdf-val">{{ req.address }}</span></td></tr>
-    <tr>
-      <td style="width: 50%;" class="pdf-line-cell"><span class="pdf-label">PHONE #:</span> <span class="pdf-val">{{ req.phone }}</span></td>
-      <td style="width: 50%;" class="pdf-line-cell"><span class="pdf-label">FAX #:</span> <span class="pdf-val">{{ req.fax }}</span></td>
-    </tr>
-    <tr><td colspan="2" class="pdf-line-cell"><span class="pdf-label">EMAIL:</span> <span class="pdf-val">{{ req.email }}</span></td></tr>
-  </table>
-
-  <div class="pdf-section-head">EQUIPMENT & PARTS REQUIRED</div>
-  {% for item in req.equipment %}
-  <div class="pdf-equip-block">
-    <table class="pdf-layout-table" style="margin-bottom:0;">
+  <div class="info-box">
+    <table class="info-table">
+      <colgroup>
+        <col style="width: 15%;">
+        <col style="width: 45%;">
+        <col style="width: 12%;">
+        <col style="width: 28%;">
+      </colgroup>
       <tr>
-        <td style="width: 50%;" class="pdf-line-cell"><span class="pdf-label">MAKE:</span> <span class="pdf-val">{{ item.make }}</span></td>
-        <td style="width: 50%;" class="pdf-line-cell"><span class="pdf-label">MODEL:</span> <span class="pdf-val">{{ item.model }}</span></td>
+        <td class="bold">CUSTOMER:</td>
+        <td>{{ cust_name }}</td>
+        <td class="bold">PHONE:</td>
+        <td>{{ phone }}</td>
       </tr>
-      <tr><td colspan="2" class="pdf-line-cell"><span class="pdf-label">SERIAL #:</span> <span class="pdf-val">{{ item.serial }}</span></td></tr>
       <tr>
-        <td colspan="2" style="padding-top: 4px;">
-          <span class="pdf-label">WORK REQUIRED:</span>
-          <div class="pdf-val" style="padding-left: 2px; margin-top: 2px;">{{ item.work_required }}</div>
-        </td>
+        <td class="bold">ADDRESS:</td>
+        <td colspan="3">{{ address }}</td>
       </tr>
     </table>
+  </div>
+
+  <div class="section-header">Equipment & Parts Required</div>
+
+  {% for item in equipment %}
+  <div class="equip-box">
+    <div class="equip-row"><span class="bold">MAKE:</span> {{ item.make }} &nbsp;&nbsp;&nbsp;&nbsp; <span class="bold">MODEL:</span> {{ item.model }}</div>
+    <div class="equip-row"><span class="bold">SERIAL #:</span> {{ item.serial }}</div>
+    <div class="equip-row"><span class="bold">WORK REQUIRED:</span> {{ item.work_required }}</div>
 
     {% if item.parts %}
-    <div style="margin-top: 6px;">
-      <span class="pdf-label" style="font-size: 10px;">PARTS REQUIRED:</span>
-      <table class="pdf-table" style="margin-top: 2px;">
-        <thead>
-          <tr>
-            <th style="width: 25%;">PART #</th>
-            <th style="width: 45%;">DESCRIPTION</th>
-            <th style="width: 12%;">QTY</th>
-            <th style="width: 18%;">PRICE</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for part in item.parts %}
-          <tr>
-            <td>{{ part.part_num }}</td>
-            <td>{{ part.description }}</td>
-            <td>{{ part.qty }}</td>
-            <td>${{ "%.2f"|format(part.price) }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
+    <div class="bold" style="margin-top: 4px; margin-bottom: 2px;">PARTS REQUIRED:</div>
+    <table class="data-table">
+      <colgroup>
+        <col style="width: 25%;">
+        <col style="width: 45%;">
+        <col style="width: 12%;">
+        <col style="width: 18%;">
+      </colgroup>
+      <thead>
+        <tr>
+          <th>PART #</th>
+          <th>DESCRIPTION</th>
+          <th class="text-center">QTY</th>
+          <th class="text-right">PRICE</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for part in item.parts %}
+        <tr>
+          <td>{{ part.part_num }}</td>
+          <td>{{ part.description }}</td>
+          <td class="text-center">{{ part.qty }}</td>
+          <td class="text-right">${{ "%.2f"|format(part.price) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
     {% endif %}
   </div>
   {% endfor %}
 
-  <div class="pdf-section-head">LABOUR CHARGES</div>
-  <table class="pdf-table">
+  {% if labour %}
+  <div class="section-header">Labour Charges</div>
+  <table class="data-table">
+    <colgroup>
+      <col style="width: 20%;">
+      <col style="width: 50%;">
+      <col style="width: 12%;">
+      <col style="width: 18%;">
+    </colgroup>
     <thead>
       <tr>
-        <th style="width: 25%;">LABOUR CHARGES</th>
-        <th style="width: 45%;">DESCRIPTION</th>
-        <th style="width: 12%;"># OF HOURS</th>
-        <th style="width: 18%;">PRICE</th>
+        <th>LABOUR CODE</th>
+        <th>DESCRIPTION</th>
+        <th class="text-center">HOURS</th>
+        <th class="text-right">PRICE</th>
       </tr>
     </thead>
     <tbody>
-      {% for lab in req.labour %}
+      {% for l in labour %}
       <tr>
-        <td>{{ lab.code }}</td>
-        <td>{{ lab.description }}</td>
-        <td>{{ lab.hours }}</td>
-        <td>${{ "%.2f"|format(lab.rate * lab.hours) }}</td>
+        <td>{{ l.code }}</td>
+        <td>{{ l.description }}</td>
+        <td class="text-center">{{ l.hours }}</td>
+        <td class="text-right">${{ "%.2f"|format(l.hours * l.rate) }}</td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
+  {% endif %}
 
-  <div class="no-break">
-    <table class="pdf-layout-table" style="margin-top: 12px;">
-      <tr>
-        <td>
-          <span class="pdf-label">ADDITIONAL COMMENTS:</span>
-          <div style="border-bottom: 1px solid #333333; min-height: 22px; margin-top: 2px; font-weight: bold;" class="pdf-val">
-            {{ req.comments }}
-          </div>
-        </td>
-      </tr>
-    </table>
+  <table class="summary-table">
+    <colgroup>
+      <col style="width: 50%;">
+      <col style="width: 50%;">
+    </colgroup>
+    <tr>
+      <td class="bold text-right">TOTAL:</td>
+      <td class="bold text-right">${{ "%.2f"|format(total_amount) }}</td>
+    </tr>
+  </table>
 
-    <table class="pdf-layout-table" style="margin-top: 8px; border-top: 1px solid #333333; padding-top: 6px;">
-      <tr>
-        <td style="width: 50%;"><span class="pdf-label">CUSTOMER ACCEPTED:</span> <span class="pdf-val">[ ] PLEASE CHECK IF ACCEPTED</span></td>
-        <td style="width: 50%;"><span class="pdf-label">WORK COMPLETED:</span> <span class="pdf-val">[ ]</span></td>
-      </tr>
-      <tr>
-        <td colspan="2" class="pdf-line-cell" style="padding-top: 6px;">
-          <span class="pdf-label">SERVICE TECH:</span> <span class="pdf-val">{{ req.tech }}</span>
-        </td>
-      </tr>
-    </table>
+  <div class="bold" style="margin-top: 8px;">SERVICE TECH: {{ tech }}</div>
+
+  <div class="bold" style="margin-top: 8px;">ADDITIONAL COMMENTS:</div>
+  <div class="comments-box">
+    {{ comments }}
   </div>
+
 </body>
 </html>
 """
 
 @app.get("/", response_class=HTMLResponse)
-async def serve_frontend():
+def read_root():
     if os.path.exists("index.html"):
         with open("index.html", "r", encoding="utf-8") as f:
             return f.read()
-    return "<h1>index.html file not found in directory</h1>"
+    return "<h1>index.html not found</h1>"
 
 @app.post("/generate-pdf")
-async def generate_pdf_endpoint(payload: QuotationRequest):
+def generate_pdf(payload: QuotationPayload):
     try:
-        jinja_tmpl = Template(HTML_PDF_TEMPLATE)
-        rendered_html = jinja_tmpl.render(req=payload)
+        # Calculate total parts + labour
+        total_amount = 0.0
+        for eq in payload.equipment:
+            for pt in eq.parts:
+                total_amount += (pt.qty or 0) * (pt.price or 0.0)
+
+        for lb in payload.labour:
+            total_amount += (lb.hours or 0.0) * (lb.rate or 0.0)
+
+        template = Template(HTML_TEMPLATE)
+        rendered_html = template.render(
+            date=payload.date,
+            wo_num=payload.wo_num,
+            cust_name=payload.cust_name,
+            address=payload.address,
+            phone=payload.phone,
+            tech=payload.tech,
+            comments=payload.comments,
+            equipment=payload.equipment,
+            labour=payload.labour,
+            total_amount=total_amount
+        )
+
         pdf_bytes = HTML(string=rendered_html).write_pdf()
-        
+
         filename = f"Quotation_{payload.wo_num if payload.wo_num else 'Draft'}.pdf"
+        sanitized_filename = re.sub(r'[^\w\.-]', '_', filename)
+
         return Response(
             content=pdf_bytes,
             media_type="application/pdf",
-            headers={"Content-Disposition": f"attachment; filename={filename}"}
+            headers={"Content-Disposition": f'attachment; filename="{sanitized_filename}"'}
         )
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
