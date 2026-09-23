@@ -1,0 +1,225 @@
+<script>
+  document.getElementById('m-date').valueAsDate = new Date();
+
+  function addEquipmentInput() {
+    const list = document.getElementById('m-equipment-list');
+    const div = document.createElement('div');
+    div.className = 'item-block equipment-card';
+    div.innerHTML = `
+      <button class="btn-remove" onclick="removeEquipmentRow(this)">X</button>
+      <div class="row-2">
+        <div class="form-group"><label>Make</label><input type="text" class="inp-equip-make"></div>
+        <div class="form-group"><label>Model</label><input type="text" class="inp-equip-model"></div>
+      </div>
+      <div class="form-group"><label>Serial #</label><input type="text" class="inp-equip-serial"></div>
+      <div class="form-group"><label>Description of Service Required</label><textarea class="inp-equip-desc" rows="2"></textarea></div>
+      <div style="margin-top: 8px;">
+        <label style="color: #2563eb;">Parts for this Equipment</label>
+        <div class="parts-container"></div>
+        <button type="button" class="btn btn-add-sm" onclick="addPartToEquipment(this)">+ Add Part</button>
+      </div>
+    `;
+    list.appendChild(div);
+  }
+
+  function removeEquipmentRow(btn) {
+    const list = document.getElementById('m-equipment-list');
+    if (list.children.length > 1) {
+      btn.parentElement.remove();
+    } else {
+      alert('At least one equipment block must remain.');
+    }
+  }
+
+  function addPartToEquipment(btn) {
+    const partsContainer = btn.previousElementSibling;
+    const div = document.createElement('div');
+    div.className = 'nested-block part-card';
+    div.innerHTML = `
+      <button class="btn-remove" onclick="this.parentElement.remove()">X</button>
+      <div class="form-group"><label>Part #</label><input type="text" class="inp-part-num"></div>
+      <div class="form-group"><label>Description</label><input type="text" class="inp-part-desc"></div>
+      <div class="row-2">
+        <div class="form-group"><label>Qty</label><input type="number" class="inp-part-qty" value="1"></div>
+        <div class="form-group"><label>Price ($)</label><input type="number" class="inp-part-price" step="0.01" placeholder="0.00"></div>
+      </div>
+    `;
+    partsContainer.appendChild(div);
+  }
+
+  function addLabourInput() {
+    const div = document.createElement('div');
+    div.className = 'item-block';
+    div.innerHTML = `
+      <button class="btn-remove" onclick="this.parentElement.remove()">X</button>
+      <div class="form-group"><label>Labour Code</label><input type="text" class="inp-labour-code"></div>
+      <div class="form-group"><label>Description</label><input type="text" class="inp-labour-desc"></div>
+      <div class="row-2">
+        <div class="form-group"><label>Hours</label><input type="number" class="inp-labour-hours" step="0.5" value="1"></div>
+        <div class="form-group"><label>Rate ($/hr)</label><input type="number" class="inp-labour-rate" step="0.01" placeholder="0.00"></div>
+      </div>
+    `;
+    document.getElementById('m-labour-list').appendChild(div);
+  }
+
+  addEquipmentInput();
+  addLabourInput();
+
+  function fillSampleData() {
+    document.getElementById('m-wo-num').value = 'W0075009';
+    document.getElementById('m-cust-num').value = '05362';
+    document.getElementById('m-cust-name').value = 'Element Hotel';
+    document.getElementById('m-address').value = '479 Roncesvalles Avenue';
+    document.getElementById('m-phone').value = '416-889-4420';
+    document.getElementById('m-fax').value = '';
+    document.getElementById('m-email').value = '';
+
+    document.getElementById('m-equipment-list').innerHTML = '';
+
+    addEquipmentInput();
+    const equip1 = document.querySelectorAll('.equipment-card')[0];
+    equip1.querySelector('.inp-equip-make').value = 'Maytag';
+    equip1.querySelector('.inp-equip-model').value = 'MAT14CSAWW1';
+    equip1.querySelector('.inp-equip-serial').value = 'C22560383';
+    equip1.querySelector('.inp-equip-desc').value = 'Washer motor failing under load and belt slipping';
+
+    const addPartBtn1 = equip1.querySelector('.btn-add-sm');
+    addPartToEquipment(addPartBtn1);
+    addPartToEquipment(addPartBtn1);
+    addPartToEquipment(addPartBtn1);
+
+    const parts1 = equip1.querySelectorAll('.part-card');
+    parts1[0].querySelector('.inp-part-num').value = 'W10210383';
+    parts1[0].querySelector('.inp-part-desc').value = 'Drive Motor';
+    parts1[0].querySelector('.inp-part-qty').value = '1';
+    parts1[0].querySelector('.inp-part-price').value = '145.00';
+
+    parts1[1].querySelector('.inp-part-num').value = 'W10006384';
+    parts1[1].querySelector('.inp-part-desc').value = 'Drive Belt';
+    parts1[1].querySelector('.inp-part-qty').value = '1';
+    parts1[1].querySelector('.inp-part-price').value = '28.50';
+
+    parts1[2].querySelector('.inp-part-num').value = '22003441';
+    parts1[2].querySelector('.inp-part-desc').value = 'Water Inlet Valve';
+    parts1[2].querySelector('.inp-part-qty').value = '1';
+    parts1[2].querySelector('.inp-part-price').value = '42.00';
+
+    addEquipmentInput();
+    const equip2 = document.querySelectorAll('.equipment-card')[1];
+    equip2.querySelector('.inp-equip-make').value = 'Maytag';
+    equip2.querySelector('.inp-equip-model').value = 'MDG18MNAGW';
+    equip2.querySelector('.inp-equip-serial').value = 'D88401923';
+    equip2.querySelector('.inp-equip-desc').value = 'Dryer not heating and producing squeaking noise during cycle';
+
+    const addPartBtn2 = equip2.querySelector('.btn-add-sm');
+    addPartToEquipment(addPartBtn2);
+    addPartToEquipment(addPartBtn2);
+    addPartToEquipment(addPartBtn2);
+
+    const parts2 = equip2.querySelectorAll('.part-card');
+    parts2[0].querySelector('.inp-part-num').value = '33002795';
+    parts2[0].querySelector('.inp-part-desc').value = 'Igniter Assembly';
+    parts2[0].querySelector('.inp-part-qty').value = '1';
+    parts2[0].querySelector('.inp-part-price').value = '38.00';
+
+    parts2[1].querySelector('.inp-part-num').value = '303373K';
+    parts2[1].querySelector('.inp-part-desc').value = 'Drum Roller Kit';
+    parts2[1].querySelector('.inp-part-qty').value = '2';
+    parts2[1].querySelector('.inp-part-price').value = '18.25';
+
+    parts2[2].querySelector('.inp-part-num').value = '33002535';
+    parts2[2].querySelector('.inp-part-desc').value = 'Thermostat Cycling';
+    parts2[2].querySelector('.inp-part-qty').value = '1';
+    parts2[2].querySelector('.inp-part-price').value = '24.50';
+
+    document.getElementById('m-labour-list').innerHTML = '';
+    addLabourInput();
+    document.querySelectorAll('.inp-labour-code')[0].value = 'LAB-01';
+    document.querySelectorAll('.inp-labour-desc')[0].value = 'Onsite Service & Diagnostics';
+    document.querySelectorAll('.inp-labour-hours')[0].value = '2.5';
+    document.querySelectorAll('.inp-labour-rate')[0].value = '85.00';
+
+    document.getElementById('m-comments').value = 'All components ordered and scheduled for installation upon delivery.';
+    document.getElementById('m-tech').value = 'Carlos M.';
+  }
+
+  async function generatePDF() {
+    const btn = document.querySelector('.btn-primary');
+    btn.innerText = 'Generating PDF...';
+    btn.disabled = true;
+
+    const payload = {
+      date: document.getElementById('m-date').value || '',
+      wo_num: document.getElementById('m-wo-num').value || '',
+      cust_num: document.getElementById('m-cust-num').value || '',
+      cust_name: document.getElementById('m-cust-name').value || '',
+      address: document.getElementById('m-address').value || '',
+      phone: document.getElementById('m-phone').value || '',
+      fax: document.getElementById('m-fax').value || '',
+      email: document.getElementById('m-email').value || '',
+      comments: document.getElementById('m-comments').value || '',
+      tech: document.getElementById('m-tech').value || '',
+      equipment: [],
+      labour: []
+    };
+
+    document.querySelectorAll('.equipment-card').forEach((card) => {
+      const parts = [];
+      card.querySelectorAll('.part-card').forEach((pCard) => {
+        parts.push({
+          part_num: pCard.querySelector('.inp-part-num').value || '',
+          description: pCard.querySelector('.inp-part-desc').value || '',
+          qty: parseInt(pCard.querySelector('.inp-part-qty').value, 10) || 0,
+          price: parseFloat(pCard.querySelector('.inp-part-price').value) || 0.0
+        });
+      });
+
+      payload.equipment.push({
+        make: card.querySelector('.inp-equip-make').value || '',
+        model: card.querySelector('.inp-equip-model').value || '',
+        serial: card.querySelector('.inp-equip-serial').value || '',
+        work_required: card.querySelector('.inp-equip-desc').value || '',
+        parts: parts
+      });
+    });
+
+    const labourCodes = document.querySelectorAll('.inp-labour-code');
+    const labourDescs = document.querySelectorAll('.inp-labour-desc');
+    const labourHours = document.querySelectorAll('.inp-labour-hours');
+    const labourRates = document.querySelectorAll('.inp-labour-rate');
+
+    labourCodes.forEach((_, i) => {
+      payload.labour.push({
+        code: labourCodes[i].value || '',
+        description: labourDescs[i].value || '',
+        hours: parseFloat(labourHours[i].value) || 0.0,
+        rate: parseFloat(labourRates[i].value) || 0.0
+      });
+    });
+
+    try {
+      const response = await fetch('/generate-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) throw new Error('Failed to generate PDF');
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Quotation_${payload.wo_num || 'Draft'}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      alert('Error generating PDF: ' + err.message);
+    } finally {
+      btn.innerText = 'Download PDF';
+      btn.disabled = false;
+    }
+  }
+</script>
