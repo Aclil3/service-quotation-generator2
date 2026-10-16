@@ -3,20 +3,18 @@ import io
 import re
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, Response
-from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import List, Optional
 from jinja2 import Template
-from weasyprint import HTML, CSS
+from weasyprint import HTML
 
 app = FastAPI()
 
-# Input schemas
+# Input schemas without prices/rates
 class PartItem(BaseModel):
     part_num: Optional[str] = ""
     description: Optional[str] = ""
     qty: Optional[int] = 0
-    price: Optional[float] = 0.0
 
 class EquipmentItem(BaseModel):
     make: Optional[str] = ""
@@ -29,20 +27,20 @@ class LabourItem(BaseModel):
     code: Optional[str] = ""
     description: Optional[str] = ""
     hours: Optional[float] = 0.0
-    rate: Optional[float] = 0.0
 
 class QuotationPayload(BaseModel):
     date: Optional[str] = ""
     wo_num: Optional[str] = ""
     cust_name: Optional[str] = ""
     address: Optional[str] = ""
+    city: Optional[str] = ""
     phone: Optional[str] = ""
     tech: Optional[str] = "Adam"
     comments: Optional[str] = ""
     equipment: Optional[List[EquipmentItem]] = []
     labour: Optional[List[LabourItem]] = []
 
-# Embedded Jinja2 HTML Template with layout fixes
+# Embedded Jinja2 HTML Template updated for City and zero-price parts/labour
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
@@ -122,7 +120,6 @@ HTML_TEMPLATE = """
     margin-bottom: 4px;
   }
 
-  /* Fixed layout tables to strictly constrain width within 100% */
   table.data-table {
     width: 100%;
     table-layout: fixed;
@@ -149,19 +146,6 @@ HTML_TEMPLATE = """
   .text-right { text-align: right; }
   .text-center { text-align: center; }
   .bold { font-weight: bold; }
-
-  .summary-table {
-    width: 40%;
-    margin-left: auto;
-    table-layout: fixed;
-    border-collapse: collapse;
-    margin-top: 8px;
-  }
-
-  .summary-table td {
-    border: 1px solid #000;
-    padding: 4px 6px;
-  }
 
   .comments-box {
     border: 1px solid #000;
@@ -202,7 +186,9 @@ HTML_TEMPLATE = """
       </tr>
       <tr>
         <td class="bold">ADDRESS:</td>
-        <td colspan="3">{{ address }}</td>
+        <td>{{ address }}</td>
+        <td class="bold">CITY:</td>
+        <td>{{ city }}</td>
       </tr>
     </table>
   </div>
@@ -219,17 +205,15 @@ HTML_TEMPLATE = """
     <div class="bold" style="margin-top: 4px; margin-bottom: 2px;">PARTS REQUIRED:</div>
     <table class="data-table">
       <colgroup>
-        <col style="width: 25%;">
-        <col style="width: 45%;">
-        <col style="width: 12%;">
-        <col style="width: 18%;">
+        <col style="width: 30%;">
+        <col style="width: 55%;">
+        <col style="width: 15%;">
       </colgroup>
       <thead>
         <tr>
           <th>PART #</th>
           <th>DESCRIPTION</th>
           <th class="text-center">QTY</th>
-          <th class="text-right">PRICE</th>
         </tr>
       </thead>
       <tbody>
@@ -238,7 +222,6 @@ HTML_TEMPLATE = """
           <td>{{ part.part_num }}</td>
           <td>{{ part.description }}</td>
           <td class="text-center">{{ part.qty }}</td>
-          <td class="text-right">${{ "%.2f"|format(part.price) }}</td>
         </tr>
         {% endfor %}
       </tbody>
@@ -251,17 +234,15 @@ HTML_TEMPLATE = """
   <div class="section-header">Labour Charges</div>
   <table class="data-table">
     <colgroup>
-      <col style="width: 20%;">
-      <col style="width: 50%;">
-      <col style="width: 12%;">
-      <col style="width: 18%;">
+      <col style="width: 25%;">
+      <col style="width: 60%;">
+      <col style="width: 15%;">
     </colgroup>
     <thead>
       <tr>
         <th>LABOUR CODE</th>
         <th>DESCRIPTION</th>
         <th class="text-center">HOURS</th>
-        <th class="text-right">PRICE</th>
       </tr>
     </thead>
     <tbody>
@@ -270,23 +251,11 @@ HTML_TEMPLATE = """
         <td>{{ l.code }}</td>
         <td>{{ l.description }}</td>
         <td class="text-center">{{ l.hours }}</td>
-        <td class="text-right">${{ "%.2f"|format(l.hours * l.rate) }}</td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
   {% endif %}
-
-  <table class="summary-table">
-    <colgroup>
-      <col style="width: 50%;">
-      <col style="width: 50%;">
-    </colgroup>
-    <tr>
-      <td class="bold text-right">TOTAL:</td>
-      <td class="bold text-right">${{ "%.2f"|format(total_amount) }}</td>
-    </tr>
-  </table>
 
   <div class="bold" style="margin-top: 8px;">SERVICE TECH: {{ tech }}</div>
 
@@ -309,27 +278,18 @@ def read_root():
 @app.post("/generate-pdf")
 def generate_pdf(payload: QuotationPayload):
     try:
-        # Calculate total parts + labour
-        total_amount = 0.0
-        for eq in payload.equipment:
-            for pt in eq.parts:
-                total_amount += (pt.qty or 0) * (pt.price or 0.0)
-
-        for lb in payload.labour:
-            total_amount += (lb.hours or 0.0) * (lb.rate or 0.0)
-
         template = Template(HTML_TEMPLATE)
         rendered_html = template.render(
             date=payload.date,
             wo_num=payload.wo_num,
             cust_name=payload.cust_name,
             address=payload.address,
+            city=payload.city,
             phone=payload.phone,
             tech=payload.tech,
             comments=payload.comments,
             equipment=payload.equipment,
-            labour=payload.labour,
-            total_amount=total_amount
+            labour=payload.labour
         )
 
         pdf_bytes = HTML(string=rendered_html).write_pdf()
