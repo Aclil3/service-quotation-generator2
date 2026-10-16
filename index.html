@@ -55,9 +55,15 @@
     </div>
   </div>
 
-  <div class="form-group">
-    <label>Address</label>
-    <input type="text" id="m-address">
+  <div class="row-2">
+    <div class="form-group">
+      <label>Address</label>
+      <input type="text" id="m-address">
+    </div>
+    <div class="form-group">
+      <label>City</label>
+      <input type="text" id="m-city">
+    </div>
   </div>
 
   <div class="section-title">Equipment & Parts Required</div>
@@ -129,10 +135,7 @@
       <button class="btn-remove" onclick="this.parentElement.remove()">X</button>
       <div class="form-group"><label>Part #</label><input type="text" class="inp-part-num"></div>
       <div class="form-group"><label>Description</label><input type="text" class="inp-part-desc"></div>
-      <div class="row-2">
-        <div class="form-group"><label>Qty</label><input type="number" class="inp-part-qty" value="1"></div>
-        <div class="form-group"><label>Price ($)</label><input type="number" class="inp-part-price" step="0.01" placeholder="0.00"></div>
-      </div>
+      <div class="form-group"><label>Qty</label><input type="number" class="inp-part-qty" value="1"></div>
     `;
     partsContainer.appendChild(div);
   }
@@ -144,10 +147,7 @@
       <button class="btn-remove" onclick="this.parentElement.remove()">X</button>
       <div class="form-group"><label>Labour Code</label><input type="text" class="inp-labour-code"></div>
       <div class="form-group"><label>Description</label><input type="text" class="inp-labour-desc"></div>
-      <div class="row-2">
-        <div class="form-group"><label>Hours</label><input type="number" class="inp-labour-hours" step="0.5" value="1"></div>
-        <div class="form-group"><label>Rate ($/hr)</label><input type="number" class="inp-labour-rate" step="0.01" placeholder="0.00"></div>
-      </div>
+      <div class="form-group"><label>Hours</label><input type="number" class="inp-labour-hours" step="0.5" value="1"></div>
     `;
     document.getElementById('m-labour-list').appendChild(div);
   }
@@ -156,6 +156,7 @@
     document.getElementById('m-wo-num').value = 'W0075009';
     document.getElementById('m-cust-name').value = 'Element Hotel';
     document.getElementById('m-address').value = '479 Roncesvalles Avenue';
+    document.getElementById('m-city').value = 'Toronto';
     document.getElementById('m-phone').value = '416-889-4420';
 
     document.getElementById('m-equipment-list').innerHTML = '';
@@ -176,17 +177,14 @@
     parts1[0].querySelector('.inp-part-num').value = 'W10210383';
     parts1[0].querySelector('.inp-part-desc').value = 'Drive Motor';
     parts1[0].querySelector('.inp-part-qty').value = '1';
-    parts1[0].querySelector('.inp-part-price').value = '145.00';
 
     parts1[1].querySelector('.inp-part-num').value = 'W10006384';
     parts1[1].querySelector('.inp-part-desc').value = 'Drive Belt';
     parts1[1].querySelector('.inp-part-qty').value = '1';
-    parts1[1].querySelector('.inp-part-price').value = '28.50';
 
     parts1[2].querySelector('.inp-part-num').value = '22003441';
     parts1[2].querySelector('.inp-part-desc').value = 'Water Inlet Valve';
     parts1[2].querySelector('.inp-part-qty').value = '1';
-    parts1[2].querySelector('.inp-part-price').value = '42.00';
 
     addEquipmentInput();
     const equip2 = document.querySelectorAll('.equipment-card')[1];
@@ -204,24 +202,20 @@
     parts2[0].querySelector('.inp-part-num').value = '33002795';
     parts2[0].querySelector('.inp-part-desc').value = 'Igniter Assembly';
     parts2[0].querySelector('.inp-part-qty').value = '1';
-    parts2[0].querySelector('.inp-part-price').value = '38.00';
 
     parts2[1].querySelector('.inp-part-num').value = '303373K';
     parts2[1].querySelector('.inp-part-desc').value = 'Drum Roller Kit';
     parts2[1].querySelector('.inp-part-qty').value = '2';
-    parts2[1].querySelector('.inp-part-price').value = '18.25';
 
     parts2[2].querySelector('.inp-part-num').value = '33002535';
     parts2[2].querySelector('.inp-part-desc').value = 'Thermostat Cycling';
     parts2[2].querySelector('.inp-part-qty').value = '1';
-    parts2[2].querySelector('.inp-part-price').value = '24.50';
 
     document.getElementById('m-labour-list').innerHTML = '';
     addLabourInput();
     document.querySelectorAll('.inp-labour-code')[0].value = 'LAB-01';
     document.querySelectorAll('.inp-labour-desc')[0].value = 'Onsite Service & Diagnostics';
     document.querySelectorAll('.inp-labour-hours')[0].value = '2.5';
-    document.querySelectorAll('.inp-labour-rate')[0].value = '85.00';
 
     document.getElementById('m-tech').value = 'Adam';
     document.getElementById('m-comments').value = 'All components ordered and scheduled for installation upon delivery.';
@@ -237,6 +231,7 @@
       wo_num: document.getElementById('m-wo-num').value || '',
       cust_name: document.getElementById('m-cust-name').value || '',
       address: document.getElementById('m-address').value || '',
+      city: document.getElementById('m-city').value || '',
       phone: document.getElementById('m-phone').value || '',
       tech: document.getElementById('m-tech').value || '',
       comments: document.getElementById('m-comments').value || '',
@@ -250,8 +245,7 @@
         parts.push({
           part_num: pCard.querySelector('.inp-part-num').value || '',
           description: pCard.querySelector('.inp-part-desc').value || '',
-          qty: parseInt(pCard.querySelector('.inp-part-qty').value, 10) || 0,
-          price: parseFloat(pCard.querySelector('.inp-part-price').value) || 0.0
+          qty: parseInt(pCard.querySelector('.inp-part-qty').value, 10) || 0
         });
       });
 
@@ -267,14 +261,12 @@
     const labourCodes = document.querySelectorAll('.inp-labour-code');
     const labourDescs = document.querySelectorAll('.inp-labour-desc');
     const labourHours = document.querySelectorAll('.inp-labour-hours');
-    const labourRates = document.querySelectorAll('.inp-labour-rate');
 
     labourCodes.forEach((_, i) => {
       payload.labour.push({
         code: labourCodes[i].value || '',
         description: labourDescs[i].value || '',
-        hours: parseFloat(labourHours[i].value) || 0.0,
-        rate: parseFloat(labourRates[i].value) || 0.0
+        hours: parseFloat(labourHours[i].value) || 0.0
       });
     });
 
