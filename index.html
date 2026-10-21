@@ -71,8 +71,10 @@
   <button type="button" class="btn btn-secondary" onclick="addEquipmentInput()">+ Add Equipment Block</button>
 
   <div class="section-title">Labour Charges</div>
-  <div id="m-labour-list"></div>
-  <button type="button" class="btn btn-secondary" onclick="addLabourInput()">+ Add Labour Block</button>
+  <div class="form-group">
+    <label>Estimated Labour Hours</label>
+    <input type="number" id="m-labour-hours" step="0.5" value="2.5" placeholder="e.g. 2.5">
+  </div>
 
   <div class="section-title">Additional Info</div>
   <div class="form-group">
@@ -94,7 +96,6 @@
       dateInput.valueAsDate = new Date();
     }
     addEquipmentInput();
-    addLabourInput();
   });
 
   function addEquipmentInput() {
@@ -140,24 +141,13 @@
     partsContainer.appendChild(div);
   }
 
-  function addLabourInput() {
-    const div = document.createElement('div');
-    div.className = 'item-block';
-    div.innerHTML = `
-      <button class="btn-remove" onclick="this.parentElement.remove()">X</button>
-      <div class="form-group"><label>Labour Code</label><input type="text" class="inp-labour-code"></div>
-      <div class="form-group"><label>Description</label><input type="text" class="inp-labour-desc"></div>
-      <div class="form-group"><label>Hours</label><input type="number" class="inp-labour-hours" step="0.5" value="1"></div>
-    `;
-    document.getElementById('m-labour-list').appendChild(div);
-  }
-
   function fillSampleData() {
     document.getElementById('m-wo-num').value = 'W0075009';
     document.getElementById('m-cust-name').value = 'Element Hotel';
     document.getElementById('m-address').value = '479 Roncesvalles Avenue';
     document.getElementById('m-city').value = 'Toronto';
     document.getElementById('m-phone').value = '416-889-4420';
+    document.getElementById('m-labour-hours').value = '2.5';
 
     document.getElementById('m-equipment-list').innerHTML = '';
 
@@ -211,12 +201,6 @@
     parts2[2].querySelector('.inp-part-desc').value = 'Thermostat Cycling';
     parts2[2].querySelector('.inp-part-qty').value = '1';
 
-    document.getElementById('m-labour-list').innerHTML = '';
-    addLabourInput();
-    document.querySelectorAll('.inp-labour-code')[0].value = 'LAB-01';
-    document.querySelectorAll('.inp-labour-desc')[0].value = 'Onsite Service & Diagnostics';
-    document.querySelectorAll('.inp-labour-hours')[0].value = '2.5';
-
     document.getElementById('m-tech').value = 'Adam';
     document.getElementById('m-comments').value = 'All components ordered and scheduled for installation upon delivery.';
   }
@@ -233,10 +217,10 @@
       address: document.getElementById('m-address').value || '',
       city: document.getElementById('m-city').value || '',
       phone: document.getElementById('m-phone').value || '',
+      labour_hours: parseFloat(document.getElementById('m-labour-hours').value) || 0.0,
       tech: document.getElementById('m-tech').value || '',
       comments: document.getElementById('m-comments').value || '',
-      equipment: [],
-      labour: []
+      equipment: []
     };
 
     document.querySelectorAll('.equipment-card').forEach((card) => {
@@ -255,18 +239,6 @@
         serial: card.querySelector('.inp-equip-serial').value || '',
         work_required: card.querySelector('.inp-equip-desc').value || '',
         parts: parts
-      });
-    });
-
-    const labourCodes = document.querySelectorAll('.inp-labour-code');
-    const labourDescs = document.querySelectorAll('.inp-labour-desc');
-    const labourHours = document.querySelectorAll('.inp-labour-hours');
-
-    labourCodes.forEach((_, i) => {
-      payload.labour.push({
-        code: labourCodes[i].value || '',
-        description: labourDescs[i].value || '',
-        hours: parseFloat(labourHours[i].value) || 0.0
       });
     });
 
