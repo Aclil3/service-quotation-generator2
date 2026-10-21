@@ -10,7 +10,7 @@ from weasyprint import HTML
 
 app = FastAPI()
 
-# Input schemas without prices/rates
+# Input schemas without Labour Code/Description
 class PartItem(BaseModel):
     part_num: Optional[str] = ""
     description: Optional[str] = ""
@@ -23,11 +23,6 @@ class EquipmentItem(BaseModel):
     work_required: Optional[str] = ""
     parts: Optional[List[PartItem]] = []
 
-class LabourItem(BaseModel):
-    code: Optional[str] = ""
-    description: Optional[str] = ""
-    hours: Optional[float] = 0.0
-
 class QuotationPayload(BaseModel):
     date: Optional[str] = ""
     wo_num: Optional[str] = ""
@@ -35,12 +30,12 @@ class QuotationPayload(BaseModel):
     address: Optional[str] = ""
     city: Optional[str] = ""
     phone: Optional[str] = ""
+    labour_hours: Optional[float] = 0.0
     tech: Optional[str] = "Adam"
     comments: Optional[str] = ""
     equipment: Optional[List[EquipmentItem]] = []
-    labour: Optional[List[LabourItem]] = []
 
-# Embedded Jinja2 HTML Template updated for City and zero-price parts/labour
+# Embedded Jinja2 HTML Template styled for enhanced readability
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
@@ -49,17 +44,18 @@ HTML_TEMPLATE = """
 <style>
   @page {
     size: letter;
-    margin: 10mm;
+    margin: 14mm 14mm 14mm 14mm;
   }
   
   * {
     box-sizing: border-box;
-    font-family: Helvetica, Arial, sans-serif;
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
   }
   
   body {
-    font-size: 10px;
-    color: #000000;
+    font-size: 11px;
+    line-height: 1.5;
+    color: #0f172a;
     margin: 0;
     padding: 0;
   }
@@ -67,23 +63,32 @@ HTML_TEMPLATE = """
   .header-table {
     width: 100%;
     border-collapse: collapse;
-    margin-bottom: 8px;
+    margin-bottom: 16px;
   }
 
   .header-table td {
-    vertical-align: top;
+    vertical-align: middle;
   }
 
   .title-main {
-    font-size: 16px;
-    font-weight: bold;
+    font-size: 20px;
+    font-weight: 700;
     text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #1e293b;
+  }
+
+  .meta-info {
+    font-size: 11px;
+    color: #334155;
   }
 
   .info-box {
-    border: 1px solid #000;
-    padding: 6px;
-    margin-bottom: 8px;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    background-color: #f8fafc;
+    padding: 8px 12px;
+    margin-bottom: 14px;
     width: 100%;
   }
 
@@ -94,65 +99,88 @@ HTML_TEMPLATE = """
   }
 
   .info-table td {
-    padding: 2px 4px;
+    padding: 4px 6px;
     vertical-align: top;
     word-wrap: break-word;
   }
 
   .section-header {
-    background-color: #e5e7eb;
-    font-weight: bold;
+    background-color: #f1f5f9;
+    color: #0f172a;
+    font-weight: 700;
     font-size: 11px;
-    padding: 4px 6px;
-    border: 1px solid #000;
+    padding: 6px 10px;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
     text-transform: uppercase;
-    margin-top: 8px;
-    margin-bottom: 4px;
+    letter-spacing: 0.5px;
+    margin-top: 14px;
+    margin-bottom: 8px;
   }
 
   .equip-box {
-    border: 1px solid #000;
-    margin-bottom: 8px;
-    padding: 6px;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    margin-bottom: 10px;
+    padding: 10px 12px;
   }
 
   .equip-row {
     margin-bottom: 4px;
+    font-size: 11px;
   }
 
   table.data-table {
     width: 100%;
     table-layout: fixed;
     border-collapse: collapse;
-    margin-top: 4px;
-    margin-bottom: 6px;
+    margin-top: 8px;
+    margin-bottom: 4px;
   }
 
   table.data-table th, table.data-table td {
-    border: 1px solid #000;
-    padding: 4px 6px;
+    border: 1px solid #cbd5e1;
+    padding: 6px 8px;
     text-align: left;
     word-wrap: break-word;
     overflow-wrap: break-word;
   }
 
   table.data-table th {
-    background-color: #f3f4f6;
-    font-size: 9px;
-    font-weight: bold;
+    background-color: #f8fafc;
+    font-size: 10px;
+    font-weight: 700;
+    color: #334155;
     text-transform: uppercase;
+  }
+
+  .labour-box {
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    background-color: #ffffff;
+    font-size: 12px;
   }
 
   .text-right { text-align: right; }
   .text-center { text-align: center; }
-  .bold { font-weight: bold; }
+  .bold { font-weight: 700; color: #1e293b; }
 
   .comments-box {
-    border: 1px solid #000;
-    padding: 6px;
-    min-height: 40px;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    padding: 8px 10px;
+    min-height: 48px;
     margin-top: 4px;
     word-wrap: break-word;
+    background-color: #ffffff;
+    font-size: 11px;
+  }
+
+  .footer-row {
+    margin-top: 12px;
+    font-size: 11px;
   }
 </style>
 </head>
@@ -163,7 +191,7 @@ HTML_TEMPLATE = """
       <td>
         <div class="title-main">Service Quotation</div>
       </td>
-      <td class="text-right">
+      <td class="text-right meta-info">
         <div><span class="bold">Date:</span> {{ date }}</div>
         <div><span class="bold">Work Order #:</span> {{ wo_num }}</div>
       </td>
@@ -173,8 +201,8 @@ HTML_TEMPLATE = """
   <div class="info-box">
     <table class="info-table">
       <colgroup>
-        <col style="width: 15%;">
-        <col style="width: 45%;">
+        <col style="width: 16%;">
+        <col style="width: 44%;">
         <col style="width: 12%;">
         <col style="width: 28%;">
       </colgroup>
@@ -202,7 +230,7 @@ HTML_TEMPLATE = """
     <div class="equip-row"><span class="bold">WORK REQUIRED:</span> {{ item.work_required }}</div>
 
     {% if item.parts %}
-    <div class="bold" style="margin-top: 4px; margin-bottom: 2px;">PARTS REQUIRED:</div>
+    <div class="bold" style="margin-top: 8px; margin-bottom: 2px;">PARTS REQUIRED:</div>
     <table class="data-table">
       <colgroup>
         <col style="width: 30%;">
@@ -230,36 +258,14 @@ HTML_TEMPLATE = """
   </div>
   {% endfor %}
 
-  {% if labour %}
-  <div class="section-header">Labour Charges</div>
-  <table class="data-table">
-    <colgroup>
-      <col style="width: 25%;">
-      <col style="width: 60%;">
-      <col style="width: 15%;">
-    </colgroup>
-    <thead>
-      <tr>
-        <th>LABOUR CODE</th>
-        <th>DESCRIPTION</th>
-        <th class="text-center">HOURS</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for l in labour %}
-      <tr>
-        <td>{{ l.code }}</td>
-        <td>{{ l.description }}</td>
-        <td class="text-center">{{ l.hours }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% endif %}
+  <div class="section-header">Labour</div>
+  <div class="labour-box">
+    <span class="bold">Estimated Labour:</span> {{ labour_hours }} {{ 'hour' if labour_hours == 1 or labour_hours == 1.0 else 'hours' }}
+  </div>
 
-  <div class="bold" style="margin-top: 8px;">SERVICE TECH: {{ tech }}</div>
+  <div class="footer-row"><span class="bold">SERVICE TECH:</span> {{ tech }}</div>
 
-  <div class="bold" style="margin-top: 8px;">ADDITIONAL COMMENTS:</div>
+  <div class="footer-row"><span class="bold">ADDITIONAL COMMENTS:</span></div>
   <div class="comments-box">
     {{ comments }}
   </div>
@@ -286,10 +292,10 @@ def generate_pdf(payload: QuotationPayload):
             address=payload.address,
             city=payload.city,
             phone=payload.phone,
+            labour_hours=payload.labour_hours,
             tech=payload.tech,
             comments=payload.comments,
-            equipment=payload.equipment,
-            labour=payload.labour
+            equipment=payload.equipment
         )
 
         pdf_bytes = HTML(string=rendered_html).write_pdf()
